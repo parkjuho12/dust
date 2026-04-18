@@ -1,0 +1,369 @@
+{
+  "name": "PM10 LLM Free Generation (Baseline)",
+  "nodes": [
+    {
+      "parameters": {
+        "options": {
+          "responseMode": "responseNodes"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.chatTrigger",
+      "typeVersion": 1.4,
+      "position": [
+        -768,
+        176
+      ],
+      "id": "0a7f9107-7d3f-43be-abe5-97ab73679a53",
+      "name": "When chat message received",
+      "webhookId": "2cc61e26-0163-42f6-8ab3-a37f92addd5b"
+    },
+    {
+      "parameters": {
+        "jsCode": "const input = $json.chatInput?.trim() ?? '';\n\n// 세션에서 region 확인\nconst region = $json.region ?? null;\n\nreturn [{\n  json: {\n    ...$json,\n    chatInput: input,\n    region: region\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -528,
+        176
+      ],
+      "id": "8e970b34-312f-4c45-bd2e-3268bc42e61d",
+      "name": "Check Session State"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "cond-region",
+              "leftValue": "={{ $json.region }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "empty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -288,
+        176
+      ],
+      "id": "c095cbe5-7d9c-4d15-a9b9-ba4921ec993c",
+      "name": "Region Collected?"
+    },
+    {
+      "parameters": {
+        "message": "어느 지역 기준으로 조회할까요? (예: 서울 관악구, 서울 중구)",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chat",
+      "typeVersion": 1,
+      "position": [
+        -48,
+        336
+      ],
+      "id": "3b42c6d1-af33-4ec4-826c-b827227be154",
+      "name": "Ask Region",
+      "webhookId": "ask-region-webhook-001"
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{\n  json: {\n    ...$json,\n    region: $json.chatInput?.trim()\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        192,
+        336
+      ],
+      "id": "f37d2433-4c80-48de-8715-bcd3a58ebb73",
+      "name": "Save Region"
+    },
+    {
+      "parameters": {
+        "url": "http://host.docker.internal:8000/predict",
+        "sendQuery": true,
+        "specifyQuery": "json",
+        "jsonQuery": "={\n  \"region\": \"{{ $json.region }}\"\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -48,
+        -112
+      ],
+      "id": "1e837b8b-065c-4da3-930b-641b77a8f429",
+      "name": "PM10 Prediction API"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=사용자 입력: {{ $('When chat message received').item.json.chatInput }}\n\n현재 PM10 예측 등급: {{ $('PM10 Prediction API').item.json.prediction }} ({{ $('PM10 Prediction API').item.json.pm_level_code }})\n현재 PM10 수치: {{ $('PM10 Prediction API').item.json.current_pm10 }}\n지역: {{ $('PM10 Prediction API').item.json.requested_region }}",
+        "options": {
+          "systemMessage": "사용자 상황과 PM10 예측 등급을 보고 아래 action 코드 중 하나만 반환하세요.\n\nNORMAL_ACTIVITY | CAUTION | CAUTION_SENSITIVE | LIMIT_OUTDOOR_ACTIVITY | \nSTOP_OUTDOOR_ACTIVITY | INDOOR_RECOMMENDED | WEAR_MASK | SWITCH_TO_INDOOR | \nPROTECTIVE_MEASURES_REQUIRED | LIMIT_CHILD_OUTDOOR | CONSULT_DOCTOR_IF_OUTDOOR\n\n코드 하나만 출력하세요. 설명 금지.",
+          "batching": {}
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        176,
+        -112
+      ],
+      "id": "4dbac392-cbb3-45dc-9116-97766d810415",
+      "name": "AI Agent"
+    },
+    {
+      "parameters": {
+        "message": "={{ $json.output }}",
+        "waitUserReply": false,
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chat",
+      "typeVersion": 1,
+      "position": [
+        448,
+        -112
+      ],
+      "id": "be2d53c6-78e9-43bc-b72c-ff20f2e7be98",
+      "name": "Respond to Chat",
+      "webhookId": "965816e9-4945-4543-b1d8-e83d852868c3"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gpt-4.1-mini"
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        176,
+        96
+      ],
+      "id": "c02bda80-997c-4fb4-af36-eceb8f31cdef",
+      "name": "OpenAI Chat Model",
+      "credentials": {
+        "openAiApi": {
+          "id": "ABtzd3tee2ezj7eW",
+          "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "typeVersion": 1.3,
+      "position": [
+        272,
+        96
+      ],
+      "id": "e22f7ece-2fab-48eb-893c-b4c02057b60f",
+      "name": "Simple Memory"
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1bSmVnMHpcuA-l3weCxVGPpvs7Dt79jGvv0LR5fVh2w8",
+          "mode": "list",
+          "cachedResultName": "LOG_TO_SHEETS - sheet2",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1bSmVnMHpcuA-l3weCxVGPpvs7Dt79jGvv0LR5fVh2w8/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 1994591512,
+          "mode": "list",
+          "cachedResultName": "LOG_TO_SHEETS - sheet2",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1bSmVnMHpcuA-l3weCxVGPpvs7Dt79jGvv0LR5fVh2w8/edit#gid=1994591512"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "input_text": "={{ $('When chat message received').item.json.chatInput }}",
+            "Ai action": "={{ $json.output }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "input_text",
+              "displayName": "input_text",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Ai action",
+              "displayName": "Ai action",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheetsTool",
+      "typeVersion": 4.7,
+      "position": [
+        368,
+        96
+      ],
+      "id": "f3859604-b1cb-4801-9031-e45ebe10a288",
+      "name": "Append row in sheet in Google Sheets",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "P7igtILgkg3dIWbM",
+          "name": "Google Sheets account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When chat message received": {
+      "main": [
+        [
+          {
+            "node": "Check Session State",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Session State": {
+      "main": [
+        [
+          {
+            "node": "Region Collected?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Region Collected?": {
+      "main": [
+        [
+          {
+            "node": "PM10 Prediction API",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Ask Region",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ask Region": {
+      "main": [
+        [
+          {
+            "node": "Save Region",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PM10 Prediction API": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Respond to Chat",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Simple Memory": {
+      "ai_memory": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Append row in sheet in Google Sheets": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "65b62079-c8b7-45ad-9ad1-b302233039ff",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "61eda28c70cdff6f9d1cdeedd8504006e8fb3d7c5df9ed5127b8faa2ebf806ae"
+  },
+  "id": "uiHhkOjHLpLfsRvDmCD0g",
+  "tags": []
+}

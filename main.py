@@ -209,7 +209,7 @@ def get_air_data(station_name: str) -> Dict[str, Any]:
     }
 
     try:
-        res = requests.get(url, params=params, timeout=5)
+        res = requests.get(url, params=params, timeout=15)
         res.raise_for_status()
         payload = res.json()
 

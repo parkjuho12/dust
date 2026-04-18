@@ -1,0 +1,1184 @@
+{
+  "name": "PM10 REG-LEG Advisory1(gemma)",
+  "nodes": [
+    {
+      "parameters": {
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "value": "evD9KIv9UpM1QfVU",
+          "mode": "list",
+          "cachedResultName": "dust",
+          "cachedResultUrl": "/projects/PMEwuxYri5kWAkUv/datatables/evD9KIv9UpM1QfVU"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "=sessionId",
+              "keyValue": "={{$json.sessionId}}"
+            }
+          ]
+        },
+        "limit": 1
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        -816,
+        192
+      ],
+      "id": "bacf7cfa-5566-427e-9c6c-9e8916bc1e24",
+      "name": "Persistent Session State Retrieval",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "jsCode": "function safeJson(v, fallback) {\n  if (v == null) return fallback;\n  if (typeof v === \"object\") return v;\n  if (typeof v !== \"string\") return fallback;\n\n  try {\n    return JSON.parse(v);\n  } catch {\n    return fallback;\n  }\n}\n\nconst row = $node[\"Persistent Session State Retrieval\"]?.json ?? {};\nconst sessionId = String($json.sessionId ?? \"\").trim();\n\nconst oldFacts = safeJson(row.facts, {});\nlet oldAsked = safeJson(row.asked_history, []);\nif (!Array.isArray(oldAsked)) oldAsked = [];\n\nreturn [{\n  json: {\n    ...$json,\n    sessionId,\n    row_exists: !!row.id,\n    rowId: row.id ?? null,\n    oldFacts,\n    oldAsked,\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -576,
+        192
+      ],
+      "id": "c7d8533f-4c4a-4c67-8211-3705a88a8ead",
+      "name": "Session State Preprocessing"
+    },
+    {
+      "parameters": {
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -96,
+        -96
+      ],
+      "id": "86e73179-e6da-4589-a8ee-b95e88aea6fc",
+      "name": "Session Attribute Normalization"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "0fae567b-2252-452a-9601-c7094f6ec5f5",
+              "name": "sessionId",
+              "value": "={{$json.sessionId}}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -96,
+        96
+      ],
+      "id": "af64cfdd-459d-480d-8c8b-dcfdb5b07588",
+      "name": "Session Identifier Normalization"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "b6e04881-8fbb-475f-9090-7abacc564072",
+              "name": "user_text",
+              "value": "={{$json.chatInput}}",
+              "type": "string"
+            },
+            {
+              "id": "98e0a2d2-578d-41ec-98d2-85037444c7b8",
+              "name": "sessionId",
+              "value": "={{$json.sessionId}}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -96,
+        288
+      ],
+      "id": "0e408098-6195-439b-8468-0d522bc78ff2",
+      "name": "User Input Normalization"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=기존 facts:\n{{ JSON.stringify($json.oldFacts) }}\n\n현재 사용자 입력:\n{{ $json.user_text }}",
+        "hasOutputParser": true,
+        "options": {
+          "systemMessage": "너는 n8n의 AI Agent로 동작하는 Fact Collector다.\n\n역할:\n- 사용자 입력 텍스트에서 미리 정의된 온톨로지 슬롯에 매핑만 수행한다.\n- 판단, 질문 선택, 완료 여부 결정은 절대 하지 않는다.\n\n금지:\n- status, asked_history, next_question 생성 금지\n- 값 유추, 보완 추론, 상식 판단 금지\n\n허용:\n- 사용자 입력에 직접 등장한 표현만 근거로 슬롯 매핑\n- 근거가 불충분하면 UNKNOWN 유지\n\n[슬롯 및 허용 값]\n1. user_role: PARENT | STUDENT | TEACHER | WORKER | UNKNOWN\n2. activity_type: COMMUTE | PE_CLASS | OUTDOOR_CLASS | OUTDOOR_WORK | OUTDOOR_PLAY | EXERCISE | UNKNOWN\n3. sensitive_group: TRUE | FALSE | UNKNOWN\n4. region: 서울 자치구 문자열 | UNKNOWN\n\n[매핑 규칙]\nuser_role:\n- \"학부모\", \"아이랑\", \"아이가\", \"우리 아이\", \"엄마\", \"아빠\" → PARENT\n- \"학생\", \"학교 다님\", \"등하교\" → STUDENT\n- \"교사\", \"선생님\" → TEACHER\n- \"직장인\", \"회사원\", \"출근\", \"직장 다님\" → WORKER\n\nactivity_type:\n- \"체육대회\", \"체육시간\", \"체육수업\", \"운동회\" → PE_CLASS\n- \"현장체험\", \"야외수업\", \"야외 수업\" → OUTDOOR_CLASS\n- \"공사장\", \"야외 근무\", \"야외근무\", \"야외 작업\" → OUTDOOR_WORK\n- \"놀이터\", \"공원\", \"산책\", \"아이랑 나가\" → OUTDOOR_PLAY\n- \"러닝\", \"등산\", \"조깅\", \"마라톤\", \"운동\" → EXERCISE\n- \"출퇴근\", \"출근길\", \"통학\" → COMMUTE\n\nsensitive_group:\n- \"천식\", \"임산부\", \"노약자\", \"호흡기\", \"어린이\", \"아이\" → TRUE\n- \"건강함\", \"기저질환 없음\" → FALSE\n- 언급 없으면 → UNKNOWN (단순 미언급을 FALSE로 추론하지 말 것)\n\nregion:\n- 사용자가 말한 지역을 반드시 \"서울 OO구\" 형태로 정규화하여 추출\n- 예: \"강남\" → \"서울 강남구\", \"관악구\" → \"서울 관악구\"\n- 서울 외 지역이거나 불명확하면 UNKNOWN\n\n[출력 규칙]\n- 순수 JSON 하나만 출력 (마크다운, 부연설명 금지)\n- 최상위 키는 \"facts\" 하나만 허용\n- 각 슬롯 구조:\n  {\n    \"value\": \"매핑된 값 또는 UNKNOWN\",\n    \"evidence\": [\"근거 문구 (없으면 빈 배열 [])\"],\n    \"confidence\": 0.0 ~ 1.0 (확실하면 0.9 이상, 모호하면 0.5 이하)\n  }\n- value가 UNKNOWN이면 evidence는 [], confidence는 0.0으로 고정"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        368,
+        288
+      ],
+      "id": "dd1e20b5-1c3c-4170-84bf-5104e45f604b",
+      "name": "Ontology-Guided State Representation Controller"
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "fieldsToMatchString": "sessionId",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        1040,
+        -80
+      ],
+      "id": "9ae19c95-b835-4866-9e05-8fad599cd332",
+      "name": "Merge"
+    },
+    {
+      "parameters": {
+        "mode": "combineBySql",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        832,
+        112
+      ],
+      "id": "24cc91cd-e4e4-486d-b0b1-60c8f3c46e0b",
+      "name": "Ontology-State Integration"
+    },
+    {
+      "parameters": {
+        "schemaType": "manual",
+        "inputSchema": "{\n  \"type\": \"object\",\n  \"additionalProperties\": false,\n  \"required\": [\"facts\"],\n  \"properties\": {\n    \"facts\": {\n      \"type\": \"object\",\n      \"additionalProperties\": false,\n      \"properties\": {\n        \"user_role\": {\n          \"type\": \"object\",\n          \"required\": [\"value\"],\n          \"properties\": {\n            \"value\": { \"type\": \"string\", \"enum\": [\"PARENT\",\"STUDENT\",\"TEACHER\",\"WORKER\",\"UNKNOWN\"] },\n            \"evidence\": { \"type\": \"array\", \"items\": { \"type\": \"string\" } },\n            \"confidence\": { \"type\": \"number\", \"minimum\": 0, \"maximum\": 1 }\n          }\n        },\n        \"activity_type\": {\n          \"type\": \"object\",\n          \"required\": [\"value\"],\n          \"properties\": {\n            \"value\": { \"type\": \"string\", \"enum\": [\"COMMUTE\",\"PE_CLASS\",\"OUTDOOR_CLASS\",\"OUTDOOR_WORK\",\"OUTDOOR_PLAY\",\"EXERCISE\",\"UNKNOWN\"] },\n            \"evidence\": { \"type\": \"array\", \"items\": { \"type\": \"string\" } },\n            \"confidence\": { \"type\": \"number\", \"minimum\": 0, \"maximum\": 1 }\n          }\n        },\n        \"sensitive_group\": {\n          \"type\": \"object\",\n          \"required\": [\"value\"],\n          \"properties\": {\n            \"value\": { \"type\": \"string\", \"enum\": [\"TRUE\",\"FALSE\",\"UNKNOWN\"] },\n            \"evidence\": { \"type\": \"array\", \"items\": { \"type\": \"string\" } },\n            \"confidence\": { \"type\": \"number\", \"minimum\": 0, \"maximum\": 1 }\n          }\n        },\n        \"region\": {\n          \"type\": \"object\",\n          \"required\": [\"value\"],\n          \"properties\": {\n            \"value\": { \"type\": \"string\" },\n            \"evidence\": { \"type\": \"array\", \"items\": { \"type\": \"string\" } },\n            \"confidence\": { \"type\": \"number\", \"minimum\": 0, \"maximum\": 1 }\n          }\n        }\n      }\n    }\n  }\n}",
+        "autoFix": true
+      },
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [
+        544,
+        528
+      ],
+      "id": "1751d015-cd50-4a33-980d-efbf900aea51",
+      "name": "Structured Output Parser"
+    },
+    {
+      "parameters": {},
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "typeVersion": 1.3,
+      "position": [
+        416,
+        528
+      ],
+      "id": "2fb5b8b1-6595-4086-a534-83b8483a9c99",
+      "name": "Dialogue Context Memory (Non-Decision)"
+    },
+    {
+      "parameters": {
+        "jsCode": "const oldFacts = $json.oldFacts ?? {};\nconst oldAsked = $json.oldAsked ?? [];\n\nconst newFacts = $json.output?.facts ?? $json.facts ?? {};\n\nconst mergedFacts = { ...oldFacts };\n\nfor (const [key, value] of Object.entries(newFacts)) {\n  if (value && value.value && value.value !== \"UNKNOWN\") {\n    mergedFacts[key] = value;\n  } else if (!mergedFacts[key]) {\n    mergedFacts[key] = value;\n  }\n}\n\nreturn [{\n  json: {\n    ...$json,\n    facts: mergedFacts,\n    asked_history: oldAsked,\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1216,
+        -80
+      ],
+      "id": "92d88ff4-7e77-4c6f-b245-8315ce8d630a",
+      "name": "State Evidence Accumulation"
+    },
+    {
+      "parameters": {
+        "jsCode": "const facts = $json.facts ?? {};\n\nconst requiredBeforePrediction = [\n  \"user_role\",\n  \"activity_type\",\n  \"sensitive_group\",\n  \"region\"\n];\n\nconst missing = [];\n\nconst asked = Array.isArray($json.oldAsked) ? $json.oldAsked : [];\n\nfor (const key of requiredBeforePrediction) {\n  if (!facts[key] || !facts[key].value || facts[key].value === \"UNKNOWN\") {\n    if (!asked.includes(key)) {\n      missing.push(key);\n    }\n  }\n}\n\nconst questions = {\n  user_role: \"학부모, 학생, 교사, 직장인 중 어떤 상황인가요?\",\n  activity_type: \"어떤 활동과 관련된 건가요? 체육수업, 야외활동, 출근, 야외근무 중 어떤 건가요?\",\n  sensitive_group: \"미세먼지에 민감한 편인가요? 예: 어린이, 노약자, 천식 등\",\n  region: \"서울 어느 지역 기준으로 볼까요? 예: 서울 중구, 서울 관악구\"\n};\n\nconst ready_for_prediction = missing.length === 0;\n\nreturn [{\n  json: {\n    ...$json,\n    next_key: ready_for_prediction ? null : missing[0],\n    ready_for_prediction,\n    missing,\n    next_question: ready_for_prediction ? null : questions[missing[0]]\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1440,
+        -80
+      ],
+      "id": "c8c28f5b-c713-4aa2-8916-e329dce60d6c",
+      "name": "State Completeness Assessment & Query Generation"
+    },
+    {
+      "parameters": {
+        "mode": "combineBySql",
+        "query": "SELECT\n  input1.sessionId AS sessionId,\n  input2.row_exists AS row_exists,\n  input2.rowId AS rowId,\n  input2.oldFacts AS oldFacts,\n  input2.oldAsked AS oldAsked,\n  input1.action AS action,\n  input1.chatInput AS chatInput\nFROM input1\nLEFT JOIN input2 ON 1=1\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        -400,
+        -96
+      ],
+      "id": "4c874bbd-112c-4370-8338-3056ca5d13a8",
+      "name": "Session Context Integration"
+    },
+    {
+      "parameters": {
+        "message": "={{ $json.next_question }}",
+        "waitUserReply": false,
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chat",
+      "typeVersion": 1,
+      "position": [
+        2016,
+        128
+      ],
+      "id": "611cda96-60f5-4306-baee-f4663217026b",
+      "name": "Respond to Chat2",
+      "webhookId": "834827f4-f020-4d47-b7e3-1f01fd2148f5"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "6753ba04-f778-4c14-8331-02dd26cbe166",
+              "leftValue": "={{ $json.is_complete }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1872,
+        -80
+      ],
+      "id": "5b892f14-0885-4da6-bd73-e9b228f3c86c",
+      "name": "Ready for Prediction"
+    },
+    {
+      "parameters": {
+        "operation": "upsert",
+        "dataTableId": {
+          "__rl": true,
+          "value": "evD9KIv9UpM1QfVU",
+          "mode": "list",
+          "cachedResultName": "dust",
+          "cachedResultUrl": "/projects/PMEwuxYri5kWAkUv/datatables/evD9KIv9UpM1QfVU"
+        },
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "sessionId",
+              "keyValue": "={{ $json.sessionId }}"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "sessionId": "={{$json.sessionId}}",
+            "facts": "={{ JSON.stringify($json.facts ?? {}) }}",
+            "asked_history": "={{ JSON.stringify($json.missing ?? []) }}",
+            "next_key": "={{$json.next_key}}",
+            "next_question": "={{$json.next_question}}",
+            "is_complete": "={{$json.ready_for_prediction ? true : false}}",
+            "last_user_text": "={{ $json.chatInput }}",
+            "user_role": "={{$json.facts?.user_role?.value || \"\"}}",
+            "activity_type": "={{$json.facts?.activity_type?.value || \"\"}}",
+            "sensitive_group": "={{$json.facts?.sensitive_group?.value || \"\"}}",
+            "region": "={{$json.facts?.region?.value || \"\"}}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "sessionId",
+              "displayName": "sessionId",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "facts",
+              "displayName": "facts",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "next_key",
+              "displayName": "next_key",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "is_complete",
+              "displayName": "is_complete",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "last_user_text",
+              "displayName": "last_user_text",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "next_question",
+              "displayName": "next_question",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "asked_history",
+              "displayName": "asked_history",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "user_role",
+              "displayName": "user_role",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "activity_type",
+              "displayName": "activity_type",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "sensitive_group",
+              "displayName": "sensitive_group",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "region",
+              "displayName": "region",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "prediction",
+              "displayName": "prediction",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "pm_level_code",
+              "displayName": "pm_level_code",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "rule_id",
+              "displayName": "rule_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "decision",
+              "displayName": "decision",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "message",
+              "displayName": "message",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        1648,
+        -80
+      ],
+      "id": "08812014-5f7e-4878-b33b-dafb69ba9950",
+      "name": "Upsert row(s)"
+    },
+    {
+      "parameters": {
+        "options": {
+          "responseMode": "responseNodes"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.chatTrigger",
+      "typeVersion": 1.4,
+      "position": [
+        -1088,
+        -112
+      ],
+      "id": "9150437f-eaeb-4f5b-b4ff-7985bd33e1e1",
+      "name": "User Input Reception",
+      "webhookId": "000efefc-a11d-4d06-86d7-d66e7d5a7225"
+    },
+    {
+      "parameters": {
+        "url": "http://host.docker.internal:8000/predict",
+        "sendQuery": true,
+        "specifyQuery": "json",
+        "jsonQuery": "={\n  \"region\": \"{{$json.facts?.region?.value || $json.region}}\"\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        2096,
+        -96
+      ],
+      "id": "6aae2690-9458-4ac7-9429-010e860d428a",
+      "name": "HTTP Request"
+    },
+    {
+      "parameters": {
+        "jsCode": "const facts = $json.facts ?? {};\n\nconst role = facts.user_role?.value ?? \"UNKNOWN\";\nconst activity = facts.activity_type?.value ?? \"UNKNOWN\";\nconst sensitive = facts.sensitive_group?.value ?? \"UNKNOWN\";\nconst pm = $json.pm_level_code ?? \"UNKNOWN\";\n\nlet rule = {\n  rule_id: \"REG_PM_DEFAULT\",\n  source: \"환경부/에어코리아 미세먼지 행동요령\",\n  action_list: [\"CAUTION\"]\n};\n\nif (pm === \"VERY_BAD\") {\n  if (sensitive === \"TRUE\") {\n    rule = {\n      rule_id: \"REG_PM_01\",\n      source: \"환경부/에어코리아 미세먼지 행동요령\",\n      action_list: [\"INDOOR_RECOMMENDED\", \"CONSULT_DOCTOR_IF_OUTDOOR\", \"WEAR_MASK\"]\n    };\n  } else {\n    rule = {\n      rule_id: \"REG_PM_02\",\n      source: \"환경부/에어코리아 미세먼지 행동요령\",\n      action_list: [\"LIMIT_OUTDOOR_ACTIVITY\", \"WEAR_MASK\"]\n    };\n  }\n\n  if ([\"PE_CLASS\", \"OUTDOOR_CLASS\", \"OUTDOOR_PLAY\", \"EXERCISE\"].includes(activity)) {\n    rule = {\n      rule_id: \"REG_PM_03\",\n      source: \"환경부/에어코리아 미세먼지 행동요령\",\n      action_list: [\"STOP_OUTDOOR_ACTIVITY\", \"WEAR_MASK\"]\n    };\n  }\n\n  if (role === \"WORKER\" && activity === \"OUTDOOR_WORK\") {\n    rule = {\n      rule_id: \"REG_PM_04\",\n      source: \"환경부/에어코리아 미세먼지 행동요령\",\n      action_list: [\"PROTECTIVE_MEASURES_REQUIRED\", \"WEAR_MASK\"]\n    };\n  }\n}\nelse if (pm === \"BAD\") {\n  if (sensitive === \"TRUE\") {\n    rule = {\n      rule_id: \"REG_PM_05\",\n      source: \"환경부/에어코리아 미세먼지 행동요령\",\n      action_list: [\"LIMIT_OUTDOOR_ACTIVITY\", \"WEAR_MASK\"]\n    };\n  } else {\n    rule = {\n      rule_id: \"REG_PM_06\",\n      source: \"환경부/에어코리아 미세먼지 행동요령\",\n      action_list: [\"LIMIT_OUTDOOR_ACTIVITY\", \"WEAR_MASK\"]\n    };\n  }\n\n  if (role === \"TEACHER\" && [\"PE_CLASS\", \"OUTDOOR_CLASS\"].includes(activity)) {\n    rule = {\n      rule_id: \"REG_PM_07\",\n      source: \"환경부/에어코리아 미세먼지 행동요령\",\n      action_list: [\"SWITCH_TO_INDOOR\"]\n    };\n  }\n\n  if (role === \"PARENT\" && activity === \"OUTDOOR_PLAY\") {\n    rule = {\n      rule_id: \"REG_PM_08\",\n      source: \"환경부/에어코리아 미세먼지 행동요령\",\n      action_list: [\"LIMIT_CHILD_OUTDOOR\"]\n    };\n  }\n}\nelse if (pm === \"NORMAL\") {\n  if (sensitive === \"TRUE\") {\n    rule = {\n      rule_id: \"REG_PM_09A\",\n      source: \"환경부/에어코리아 미세먼지 행동요령\",\n      action_list: [\"CAUTION_SENSITIVE\"]\n    };\n  } else {\n    rule = {\n      rule_id: \"REG_PM_09\",\n      source: \"환경부/에어코리아 미세먼지 행동요령\",\n      action_list: [\"CAUTION\"]\n    };\n  }\n}\nelse if (pm === \"GOOD\") {\n  rule = {\n    rule_id: \"REG_PM_10\",\n    source: \"환경부/에어코리아 미세먼지 행동요령\",\n    action_list: [\"NORMAL_ACTIVITY\"]\n  };\n}\n\nreturn [{ json: { ...$json, rule } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2544,
+        -96
+      ],
+      "id": "3c5efb87-dfb1-48bd-8be2-644803c1b05d",
+      "name": "Regulatory Rule Retrieval"
+    },
+    {
+      "parameters": {
+        "jsCode": "const rule = $json.rule;\n\nreturn [{\n  json: {\n    ...$json,\n    decision: rule?.action_list ?? [],\n    rule_id: rule?.rule_id ?? null\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2784,
+        -96
+      ],
+      "id": "22072344-b0e1-4fbc-996b-e931395225e2",
+      "name": "Deterministic Logical Evaluation (LEG)"
+    },
+    {
+      "parameters": {
+        "message": "={{ $('Judgment Explanation Generation').item.json.reply }}",
+        "waitUserReply": false,
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chat",
+      "typeVersion": 1,
+      "position": [
+        3536,
+        -96
+      ],
+      "id": "d372c16d-6066-44fe-9384-2cda5b93e3de",
+      "name": "Judgment Result Delivery",
+      "webhookId": "458c610d-5896-47c6-a4ae-2d503ccf4f4c"
+    },
+    {
+      "parameters": {
+        "jsCode": "const pred = $json;\n\n// Ready for Prediction 시점의 원본 컨텍스트를 다시 가져옴\nconst base = $('Ready for Prediction').item.json;\n\nreturn [{\n  json: {\n    ...base,\n    ...pred\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2320,
+        -96
+      ],
+      "id": "cfb3cb4e-e091-4b59-8f38-174f58967880",
+      "name": "Prediction Context Restore"
+    },
+    {
+      "parameters": {
+        "model": "gemma:latest",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOllama",
+      "typeVersion": 1,
+      "position": [
+        224,
+        496
+      ],
+      "id": "6eb6378d-efa7-4ed9-9cc4-712a9581860d",
+      "name": "Ollama Chat Model",
+      "credentials": {
+        "ollamaApi": {
+          "id": "nlNQD6agkelovcEb",
+          "name": "Ollama account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "model": "gemma:latest",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOllama",
+      "typeVersion": 1,
+      "position": [
+        544,
+        704
+      ],
+      "id": "02ba0bbb-5f5d-4bd7-a791-2fb7ca928f24",
+      "name": "Ollama Chat Model1",
+      "credentials": {
+        "ollamaApi": {
+          "id": "nlNQD6agkelovcEb",
+          "name": "Ollama account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "",
+        "height": 1104,
+        "width": 640,
+        "color": 4
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        144,
+        -240
+      ],
+      "id": "2a476c4d-40ae-4493-a00b-0e32820f7e06",
+      "name": "Sticky Note"
+    },
+    {
+      "parameters": {
+        "content": "",
+        "height": 1104,
+        "width": 1312,
+        "color": 3
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -1168,
+        -240
+      ],
+      "id": "f2e023c3-63f9-48f2-9dc8-f0e98e6afc91",
+      "name": "Sticky Note1"
+    },
+    {
+      "parameters": {
+        "content": "",
+        "height": 1104,
+        "width": 1040
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        784,
+        -240
+      ],
+      "id": "99e3863a-951f-4fe7-9ec2-263ed59ce941",
+      "name": "Sticky Note2"
+    },
+    {
+      "parameters": {
+        "content": "",
+        "height": 1104,
+        "width": 2000,
+        "color": 5
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        1824,
+        -240
+      ],
+      "id": "fecb8209-ba9a-4d4d-af05-1a11017f970c",
+      "name": "Sticky Note3"
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1LAHVytxRGNjnOGWM0bQa9UpGyZmR_OpO1NUbHRz9xIo",
+          "mode": "list",
+          "cachedResultName": "LOG_SHEET_DUST1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1LAHVytxRGNjnOGWM0bQa9UpGyZmR_OpO1NUbHRz9xIo/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "시트1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1LAHVytxRGNjnOGWM0bQa9UpGyZmR_OpO1NUbHRz9xIo/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "test_id": "={{ $json.sessionId }}",
+            "timestamp": "={{$now}}",
+            "input_text": "={{ $json.last_user_text }}",
+            "user_role": "={{ $json.user_role }}",
+            "activity_type": "={{ $json.activity_type }}",
+            "sensitive_group": "={{ $json.sensitive_group }}",
+            "region": "={{ $json.region }}",
+            "prediction": "={{ $json.prediction }}",
+            "pm_level_code": "={{ $json.pm_level_code }}",
+            "rule_key": "={{ $json.rule_id }}",
+            "action": "={{$json.rule.action_list[0] }}",
+            "reg_status": "={{ $json.rule_id }}",
+            "reason_codes": "={{$json.rule.action_list[0] }}",
+            "explanation": "={{ $json.leg_message }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "test_id",
+              "displayName": "test_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "timestamp",
+              "displayName": "timestamp",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "input_text",
+              "displayName": "input_text",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "user_role",
+              "displayName": "user_role",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "activity_type",
+              "displayName": "activity_type",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "sensitive_group",
+              "displayName": "sensitive_group",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "region",
+              "displayName": "region",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "prediction",
+              "displayName": "prediction",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "pm_level_code",
+              "displayName": "pm_level_code",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "rule_key",
+              "displayName": "rule_key",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "action",
+              "displayName": "action",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "reg_status",
+              "displayName": "reg_status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "reason_codes",
+              "displayName": "reason_codes",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "explanation",
+              "displayName": "explanation",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        3280,
+        -96
+      ],
+      "id": "12fbed7c-58ad-4fb2-91f1-842f496ed1cb",
+      "name": "Judgment Outcome Logging",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "P7igtILgkg3dIWbM",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const actions = Array.isArray($json.decision) ? $json.decision : [];\n\nconst pmCode = $json.pm_level_code || \"UNKNOWN\";\n\n// 여기만 바꿔\nconst role = $json.user_role || \"UNKNOWN\";\nconst activity = $json.activity_type || \"UNKNOWN\";\nconst sensitive = $json.sensitive_group || \"UNKNOWN\";\nconst region = $json.region || $json.requested_region || \"\";\n\nlet messages = [];\n\n// 1. 상태 설명\nif (pmCode === \"GOOD\") {\n  messages.push(\n    region\n      ? `${region} 기준으로 보면 공기질은 전반적으로 양호한 상태로 예상됩니다.`\n      : \"현재 예측으로는 공기질이 전반적으로 양호한 상태입니다.\"\n  );\n} else if (pmCode === \"NORMAL\") {\n  messages.push(\n    region\n      ? `${region} 기준으로 보면 공기질은 비교적 안정적인 수준으로 예상됩니다.`\n      : \"현재 예측으로는 공기질이 비교적 안정적인 수준입니다.\"\n  );\n} else if (pmCode === \"BAD\") {\n  messages.push(\n    region\n      ? `${region} 기준으로 보면 공기질이 다소 나쁜 수준으로 예상됩니다.`\n      : \"현재 공기질이 다소 나쁜 수준으로 예상됩니다.\"\n  );\n} else if (pmCode === \"VERY_BAD\") {\n  messages.push(\n    region\n      ? `${region} 기준으로 보면 공기질이 매우 나쁜 상태로 예상됩니다.`\n      : \"현재 공기질이 매우 나쁜 상태로 예상됩니다.\"\n  );\n} else {\n  messages.push(\"현재 공기질 상태를 해석 중입니다.\");\n}\n\n// 2. 사용자 조건 반영\nif (sensitive === \"TRUE\") {\n  messages.push(\"천식 등 호흡기 민감군의 경우 일반인보다 영향을 더 받을 수 있습니다.\");\n}\n\nif (role === \"WORKER\" && activity === \"OUTDOOR_WORK\") {\n  messages.push(\"야외 근무 환경에서는 미세먼지 노출이 더 클 수 있습니다.\");\n}\n\nif (role === \"TEACHER\" && [\"PE_CLASS\", \"OUTDOOR_CLASS\"].includes(activity)) {\n  messages.push(\"야외 수업 상황에서는 학생들의 노출을 더 신중하게 볼 필요가 있습니다.\");\n}\n\nif (role === \"PARENT\" && activity === \"OUTDOOR_PLAY\") {\n  messages.push(\"아이의 야외 활동은 상황에 맞게 조절하는 것이 좋습니다.\");\n}\n\n// 3. 행동 제시\nif (actions.includes(\"STOP_OUTDOOR_ACTIVITY\")) {\n  messages.push(\"야외 활동을 중단하고 실내 활동으로 전환하세요.\");\n}\nif (actions.includes(\"LIMIT_OUTDOOR_ACTIVITY\")) {\n  messages.push(\"장시간 또는 무리한 실외활동은 줄이세요.\");\n}\nif (actions.includes(\"INDOOR_RECOMMENDED\")) {\n  messages.push(\"가급적 실내 활동 위주로 하세요.\");\n}\nif (actions.includes(\"WEAR_MASK\")) {\n  messages.push(\"외출 시 보건용 마스크 착용을 권장합니다.\");\n}\nif (actions.includes(\"CONSULT_DOCTOR_IF_OUTDOOR\")) {\n  messages.push(\"외출이 필요하다면 의료진과 상담을 고려하세요.\");\n}\nif (actions.includes(\"SWITCH_TO_INDOOR\")) {\n  messages.push(\"야외 활동은 실내 활동으로 대체하는 것이 좋습니다.\");\n}\nif (actions.includes(\"PROTECTIVE_MEASURES_REQUIRED\")) {\n  messages.push(\"야외 작업 시 보호 장비를 반드시 착용하세요.\");\n}\nif (actions.includes(\"LIMIT_CHILD_OUTDOOR\")) {\n  messages.push(\"아이의 야외 활동 시간을 줄이세요.\");\n}\nif (actions.includes(\"CAUTION\")) {\n  messages.push(\"현재 상태를 보면서 무리하지 않는 범위에서 활동하세요.\");\n}\nif (actions.includes(\"CAUTION_SENSITIVE\")) {\n  messages.push(\"무리한 실외활동은 피하고 몸 상태를 보며 활동하세요.\");\n}\nif (actions.includes(\"NORMAL_ACTIVITY\")) {\n  messages.push(\"일반적인 야외 활동이 가능합니다.\");\n}\n\n// 4. 마지막 fallback\nif (actions.length === 0) {\n  if (sensitive === \"TRUE\") {\n    messages.push(\"몸 상태를 보며 무리하지 않는 선에서 활동하세요.\");\n  } else {\n    messages.push(\"현재 상태를 보면서 활동하세요.\");\n  }\n}\n\nconst finalMessage = messages.join(\" \");\n\nreturn [{\n  json: {\n    ...$json,\n    reply: finalMessage,\n    message: finalMessage,\n    leg_message: finalMessage  // 추가\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3056,
+        -96
+      ],
+      "id": "34bd76ff-c4b4-4120-a43f-a5b122ea121b",
+      "name": "Judgment Explanation Generation"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Persistent Session State Retrieval": {
+      "main": [
+        [
+          {
+            "node": "Session State Preprocessing",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Session State Preprocessing": {
+      "main": [
+        [
+          {
+            "node": "Session Context Integration",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Session Attribute Normalization": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Session Identifier Normalization": {
+      "main": [
+        [
+          {
+            "node": "Ontology-State Integration",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "User Input Normalization": {
+      "main": [
+        [
+          {
+            "node": "Ontology-Guided State Representation Controller",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ontology-Guided State Representation Controller": {
+      "main": [
+        [
+          {
+            "node": "Ontology-State Integration",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Ontology-State Integration": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge": {
+      "main": [
+        [
+          {
+            "node": "State Evidence Accumulation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Structured Output Parser": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "Ontology-Guided State Representation Controller",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Dialogue Context Memory (Non-Decision)": {
+      "ai_memory": [
+        [
+          {
+            "node": "Ontology-Guided State Representation Controller",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "State Evidence Accumulation": {
+      "main": [
+        [
+          {
+            "node": "State Completeness Assessment & Query Generation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "State Completeness Assessment & Query Generation": {
+      "main": [
+        [
+          {
+            "node": "Upsert row(s)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Session Context Integration": {
+      "main": [
+        [
+          {
+            "node": "Session Attribute Normalization",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Session Identifier Normalization",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "User Input Normalization",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ready for Prediction": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond to Chat2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upsert row(s)": {
+      "main": [
+        [
+          {
+            "node": "Ready for Prediction",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "User Input Reception": {
+      "main": [
+        [
+          {
+            "node": "Session Context Integration",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Persistent Session State Retrieval",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request": {
+      "main": [
+        [
+          {
+            "node": "Prediction Context Restore",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Regulatory Rule Retrieval": {
+      "main": [
+        [
+          {
+            "node": "Deterministic Logical Evaluation (LEG)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Deterministic Logical Evaluation (LEG)": {
+      "main": [
+        [
+          {
+            "node": "Judgment Explanation Generation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Judgment Result Delivery": {
+      "main": [
+        []
+      ]
+    },
+    "Prediction Context Restore": {
+      "main": [
+        [
+          {
+            "node": "Regulatory Rule Retrieval",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ollama Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Ontology-Guided State Representation Controller",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ollama Chat Model1": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Structured Output Parser",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Judgment Outcome Logging": {
+      "main": [
+        [
+          {
+            "node": "Judgment Result Delivery",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Judgment Explanation Generation": {
+      "main": [
+        [
+          {
+            "node": "Judgment Outcome Logging",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "97dc31c6-714d-42fa-8ab0-cae0b1a1ac47",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "61eda28c70cdff6f9d1cdeedd8504006e8fb3d7c5df9ed5127b8faa2ebf806ae"
+  },
+  "id": "d15PmVYISOiWc6Cm",
+  "tags": []
+}
