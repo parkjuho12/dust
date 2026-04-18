@@ -9,7 +9,8 @@ data/
 models/
 
 # 출력물
-outputs/
+outputs/predictions/
+outputs/metrics/
 
 # 파이썬 캐시
 __pycache__/
