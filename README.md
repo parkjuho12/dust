@@ -20,6 +20,7 @@
 - **실시간 서빙**: FastAPI + 기상청/에어코리아 API 실시간 연동
 - **설명 가능한 추론**: 온톨로지 슬롯 + 환경부 규정 기반 결정론적 REG-LEG 프레임워크
 - **대화형 인터페이스**: n8n 워크플로우 기반 멀티턴 대화
+- **비교 실험**: REG-LEG vs LLM 자유 생성 방식 비교
 
 ## 데이터 출처
 
@@ -37,14 +38,20 @@
 │   ├── tree/                 # XGBoost, RandomForest 모델
 │   ├── tensorflow/           # TensorFlow 모델
 │   └── preprocess/           # 스케일러, 피처 목록
+├── n8n/
+│   ├── PM10_REG-LEG_Advisory1_gemma_v2.json   # REG-LEG 워크플로우
+│   └── PM10_LLM_Baseline.json                 # LLM 자유 생성 워크플로우
 ├── outputs/
 │   └── plots/                # 시각화 결과
 └── docs/
     ├── ml_pipeline.md        # ML 파이프라인 상세
-    └── api_service.md        # FastAPI 서비스 상세
-```
+    ├── api_service.md        # FastAPI 서비스 상세
+    ├── n8n_workflow.md       # n8n 워크플로우 상세
+    └── test_cases.md         # 비교 실험용 테스트 케이스 30개
+
 
 ## 상세 문서
 
 - [ML 파이프라인](docs/ml_pipeline.md)
 - [FastAPI 서비스](docs/api_service.md)
+- [n8n 워크플로우](docs/n8n_workflow.md)
